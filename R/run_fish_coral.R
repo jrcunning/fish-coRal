@@ -53,9 +53,9 @@ run_fish_coral <- function(time, env, pars) {
   }
   ## Set initial values of fish and internal nitrogen
   dP.Pdt[1] <- 0 
-  P[1] <- 1
+  P[1] <- 0.001
   dW.Wdt[1] <- 0
-  W[1] <- 1
+  W[1] <- 0.001
   VH[1] <- 1
   VHi[1] <- 0.5
   M[1] <- 0
@@ -138,7 +138,7 @@ run_fish_coral <- function(time, env, pars) {
     # Hawkfish (W)
     dW.Wdt[t] <- pars$rw * (pars$kw * VH[t]^(2/3) - pars$Bw * W[t-1] - pars$alpha.pw * P[t-1]) / (pars$kw * VH[t]^(2/3)) - pars$aw * env$U[t]
     # Internal DIN concentration (Ni)
-    dNi.dt[t] <- pars$D * (env$N[t] - Ni[t-1]) + (pars$ep + pars$ew)/VHi[t] + jNw.t*sum(S[t-1,])/VHi[t] - jN[t]*H[t-1]/VHi[t]
+    dNi.dt[t] <- pars$D * (env$N[t] - Ni[t-1]) + (pars$ep*P[t-1] + pars$ew*W[t-1] + jNw.t*sum(S[t-1,]) - jN[t]*H[t-1])/VHi[t]
 
     # State variables
     # ===============
