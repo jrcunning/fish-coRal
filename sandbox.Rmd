@@ -1,0 +1,73 @@
+---
+title: "fish-coRal sandbox"
+author: "Ross Cunning"
+date: "3/18/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+sapply(list.files(path="R/", pattern="*", full.names = TRUE), FUN=source)
+```
+
+## New parameter estimation
+
+### kv: colony volume per unit biomass (m^3^ C-mol H^-1^)
+```{r m3_Cmol, fig.width=4, fig.height=4}
+# Data from:
+# Jokiel PL, Morrissey JI (1986) Influence of size on primary production in the 
+#   reef coral Pocillopora damicornis and the macroalga Acanthophora spicifera. 
+#   Mar Biol 91:15–26
+
+# Enter data from Table 1
+df <- data_frame(
+  radius.cm = c(2.1, 3.4, 4.0, 5.0, 8.2, 12.5),
+  tissue.dry.wt.g = c(0.21, 1.68, 1.78, 4.60, 16.21, 34.66)
+)
+
+# Calculate colony volume (as a sphere) and convert biomass to Cmol
+#   Assumes 41.4% carbon by weight (Schutter et al. 2010)
+df <- df %>%
+  mutate(vol.m3 = 4/3 * pi * (radius.cm / 100)^3,
+         Cmol = tissue.dry.wt.g * 0.414 / 12.011)  # gBiomass * 0.414 gC/gBiomass * 1molC/12.011gC
+
+# Plot volume as a function of biomass
+ggplot(df, aes(x=Cmol, y=vol.m3)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se=FALSE, formula=y~x-1)
+
+# Calculate slope
+mod <- lm(vol.m3 ~ Cmol - 1, data=df)
+coef(mod)
+```
+
+## Run model and explore output
+
+### Set parameters and environment
+```{r}
+# Load all default parameter values for model with one Symbiodinium type
+pars <- def_pars(nsym = 1)
+
+# Set time vector to one year
+time <- seq(0, 300, 0.1)
+
+# Initialize constant environment with intermediate light (15 mol/m2/d), low ambient DIN (1e-7 M), no feeding, and no uber-predators.
+env <- init_env(time=time, L=c(15,15,0), N=c(1e-7,1e-7,0), X=c(0,0,0), U=c(0,0,0))
+```
+
+```{r run_model}
+run1 <- run_fish_coral(time=time, env=env, par=pars)
+```
+
+```{r plot_output, fig.height=4, fig.width=4}
+# Plot coral biomass
+ggplot(run1, aes(x=time, y=H)) + geom_line()
+
+# Plot internal nitrogen concentration
+ggplot(run1, aes(x=time, y=Ni)) + geom_line()
+
+# View first few values of internal nitrogen concentration
+head(run1$Ni)
+```
+
