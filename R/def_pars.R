@@ -1,14 +1,3 @@
-#' Get default model parameters.
-#'
-#' \code{def_pars} takes no arguments and returns the default values for all
-#' parameters used in the model.
-#'
-#' @return A list of 26 length-one numerics containing the default values for
-#'   all parameters used in the model. Each list element is named as the
-#'   parameter name.
-#' @examples
-#' def_pars()
-#' pars <- def_pars()
 
 def_pars <- function(nsym=1) {
   return(list(
@@ -41,7 +30,7 @@ def_pars <- function(nsym=1) {
     b=rep(5, nsym),  # Scaling parameter for bleaching response
     kv=1,  #cubic meters per C-mol H
     gamma=1,
-    m=1, # 1/(d * (cubic meters)^mu)
+    m=0.001, # 1/(d * (cubic meters)^mu)
     mu=1,
     # Damselfish parameters (P)
     rp=1, # intrinsic growth rate
