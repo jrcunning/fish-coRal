@@ -146,7 +146,7 @@ run_fish_coral <- function(time, env, pars) {
     S[t,] <- S[t-1,] + dS.Sdt[t,] * S[t-1,] * dt  # Biomass (Cmol)
     P[t] <- P[t-1] + dP.Pdt[t] * P[t-1] * dt  # Biomass
     W[t] <- W[t-1] + dW.Wdt[t] * W[t-1] * dt  # Biomass
-    Ni[t] <- Ni[t-1] + dNi.dt[t] * dt # Ni concentration
+    Ni[t] <- Ni[t-1] + dNi.dt[t] * Ni[t-1] * dt # Ni concentration
   }
 
   # Return results
