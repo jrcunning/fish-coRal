@@ -30,15 +30,16 @@ df <- data_frame(
 #   Assumes 41.4% carbon by weight (Schutter et al. 2010)
 df <- df %>%
   mutate(vol.m3 = 4/3 * pi * (radius.cm / 100)^3,
+         vol.L = vol.m3 * 1000,
          Cmol = tissue.dry.wt.g * 0.414 / 12.011)  # gBiomass * 0.414 gC/gBiomass * 1molC/12.011gC
 
 # Plot volume as a function of biomass
-ggplot(df, aes(x=Cmol, y=vol.m3)) + 
+ggplot(df, aes(x=Cmol, y=vol.L)) + 
   geom_point() + 
   geom_smooth(method = "lm", se=FALSE, formula=y~x-1)
 
 # Calculate slope
-mod <- lm(vol.m3 ~ Cmol - 1, data=df)
+mod <- lm(vol.L ~ Cmol - 1, data=df)
 coef(mod)
 ```
 
@@ -53,7 +54,7 @@ pars <- def_pars(nsym = 1)
 time <- seq(0, 300, 0.1)
 
 # Initialize constant environment with intermediate light (15 mol/m2/d), low ambient DIN (1e-7 M), no feeding, and no uber-predators.
-env <- init_env(time=time, L=c(15,15,0), N=c(1e-7,1e-7,0), X=c(0,0,0), U=c(0,0,0))
+env <- init_env(time=time, L=c(15,15,0), N=c(1e-6,1e-6,0), X=c(0,0,0), U=c(0,0,0))
 ```
 
 ```{r run_model}
@@ -67,7 +68,15 @@ ggplot(run1, aes(x=time, y=H)) + geom_line()
 # Plot internal nitrogen concentration
 ggplot(run1, aes(x=time, y=Ni)) + geom_line()
 
-# View first few values of internal nitrogen concentration
-head(run1$Ni)
+# Plot fish abundance
+ggplot(run1, aes(x=time, y=W/H)) + geom_line()
+
+# Plot internal nitrogen concentration
+ggplot(run1, aes(x=time, y=W/H)) + geom_line()
+```
+
+# Compare
+```{r}
+
 ```
 
