@@ -6,15 +6,21 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-library(tidyverse)
+# Set kintr options
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+# Load libraries
+library(tidyverse)  # install.packages("tidyverse")
+library(cowplot)  # install.packages("cowplot")
+
+# Load R functions
 sapply(list.files(path="R/", pattern="*", full.names = TRUE), FUN=source)
 ```
 
 ## New parameter estimation
 
-### kv: colony volume per unit biomass (m^3^ C-mol H^-1^)
-```{r m3_Cmol, fig.width=4, fig.height=4}
+### kv: colony volume per unit biomass (L/C-mol^-1^)
+```{r m3_Cmol, fig.width=7, fig.height=3}
 # Data from:
 # Jokiel PL, Morrissey JI (1986) Influence of size on primary production in the 
 #   reef coral Pocillopora damicornis and the macroalga Acanthophora spicifera. 
@@ -26,57 +32,124 @@ df <- data_frame(
   tissue.dry.wt.g = c(0.21, 1.68, 1.78, 4.60, 16.21, 34.66)
 )
 
-# Calculate colony volume (as a sphere) and convert biomass to Cmol
+# Calculate colony volume (as a hemisphere) and convert biomass to Cmol
 #   Assumes 41.4% carbon by weight (Schutter et al. 2010)
 df <- df %>%
-  mutate(vol.m3 = 4/3 * pi * (radius.cm / 100)^3,
+  mutate(vol.m3 = 2/3 * pi * (radius.cm / 100)^3,
          vol.L = vol.m3 * 1000,
          Cmol = tissue.dry.wt.g * 0.414 / 12.011)  # gBiomass * 0.414 gC/gBiomass * 1molC/12.011gC
 
-# Plot volume as a function of biomass
-ggplot(df, aes(x=Cmol, y=vol.L)) + 
+# Plot volume as a function of biomass - fit linear and exponential
+lin <- ggplot(df, aes(x=Cmol, y=vol.L)) + 
   geom_point() + 
-  geom_smooth(method = "lm", se=FALSE, formula=y~x-1)
+  geom_smooth(method = "lm", se=FALSE, formula=y~x-1) +
+  labs(x="Coral biomass (C-mol)", y="Coral volume (L)") +
+  theme_bw()
 
-# Calculate slope
-mod <- lm(vol.L ~ Cmol - 1, data=df)
-coef(mod)
+expo <- ggplot(df, aes(x=Cmol, y=vol.L)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se=FALSE, formula=y~exp(x)) +
+  labs(x="Coral biomass (C-mol)", y="Coral volume (L)") +
+  theme_bw()
+
+plot_grid(lin, expo)
+
+# Calculate slope of linear fit
+linmod <- lm(vol.L ~ Cmol - 1, data=df)
+coef(linmod)
+
+# Get coefficients of exponential model
+expomod <- nls(vol.L ~ a * Cmol ^ b, start=c(a=1, b=1), trace=F, data=df)
+#plot(vol.L ~ Cmol, data=df)
+#with(df, lines(Cmol, coef(expomod)[1] * Cmol ^ coef(expomod)[2]))
+coef(expomod)
+
 ```
+
+From these data, we estimate the value for the parameter defining coral colony volume per unit biomass to be `r round(coef(linmod), 2)` L/Cmol if we use the linear fit. We could also use the (potentially better) exponential fit with coefficients a = `r round(coef(expomod)[1], 3)` and b = `r round(coef(expomod)[2], 3)`.
 
 ## Run model and explore output
 
 ### Set parameters and environment
 ```{r}
 # Load all default parameter values for model with one Symbiodinium type
+# Default parameters start with 0.001 of both hawkfish and damselfish
 pars <- def_pars(nsym = 1)
 
-# Set time vector to one year
-time <- seq(0, 300, 0.1)
+# Set time vector to three years
+time <- seq(0, 1825, 0.1)
 
-# Initialize constant environment with intermediate light (15 mol/m2/d), low ambient DIN (1e-7 M), no feeding, and no uber-predators.
+# Initialize constant environment with intermediate light (15 mol/m2/d) and DIN (1e-6 M), no feeding, and no uber-predators.
 env <- init_env(time=time, L=c(15,15,0), N=c(1e-6,1e-6,0), X=c(0,0,0), U=c(0,0,0))
 ```
 
+### Run simulation with both fish
 ```{r run_model}
 run1 <- run_fish_coral(time=time, env=env, par=pars)
 ```
 
-```{r plot_output, fig.height=4, fig.width=4}
-# Plot coral biomass
-ggplot(run1, aes(x=time, y=H)) + geom_line()
+### Plot coral size, interstitial [N], and associated fish biomass
+```{r plot_output, fig.height=3, fig.width=10}
+# Plot coral colony volume and internal nitrogen concentration
+growth <- ggplot(run1, aes(x=time, y=VH)) + geom_line() +
+  labs(x="Time (d)", y="Coral volume (L)",
+       title="Coral growth") +
+  theme_bw()
 
 # Plot internal nitrogen concentration
-ggplot(run1, aes(x=time, y=Ni)) + geom_line()
+interN <- ggplot(run1, aes(x=time, y=log10(Ni))) + geom_line() +
+  labs(x="Time (d)", y="Interstitial N (mol/L)",
+       title="log10 Nitrogen within coral head") +
+  theme_bw()
 
 # Plot fish abundance
-ggplot(run1, aes(x=time, y=W/H)) + geom_line()
+fish <- ggplot(run1, aes(x=time)) + 
+  geom_line(aes(y=W, col="Hawkfish")) +
+  geom_line(aes(y=P, col="Damselfish")) +
+  labs(x="Time (d)", y="Fish biomass",
+       title="Coral-associated fish") +
+  theme_bw() + theme(legend.position = c(0.7, 0.5))
 
-# Plot internal nitrogen concentration
-ggplot(run1, aes(x=time, y=W/H)) + geom_line()
+plot_grid(growth, interN, fish, ncol = 3)
 ```
 
-# Compare
+> Damselfish go to their carrying capacity while hawkfish go to zero. Why do hawkfish go to zero?
+
+======
+
+### Run simulations with hawkfish only and damselfish only
+
 ```{r}
-
+hawk.only <- run_fish_coral(time=time, env=env, 
+                            pars=replace(def_pars(), "initP", 0))
+damsel.only <- run_fish_coral(time=time, env=env, 
+                              pars=replace(def_pars(), "initW", 0))
 ```
 
+### Plot output with hawkfish only and damselfish only
+
+```{r, fig.width=10, fig.height=3}
+# Build plots for fish biomass, interstitial N, and coral growth
+fish <- ggplot() +
+  geom_line(data=hawk.only, aes(x=time, y=W, color="Hawkfish only")) +
+  geom_line(data=damsel.only, aes(x=time, y=P, color="Damselfish only")) +
+  labs(x="Time (d)", y="Fish biomass", title="Coral-associated fish") +
+  theme_bw() + theme(legend.position = c(0.7, 0.5))
+
+interN <- ggplot() +
+  geom_line(data=hawk.only, aes(x=time, y=log10(Ni), color="Hawkfish only")) +
+  geom_line(data=damsel.only, aes(x=time, y=log10(Ni), color="Damselfish only")) +
+  labs(x="Time (d)", y="log10 Interstitial N (mol/L)", title="Nitrogen within coral head") +
+  theme_bw() + theme(legend.position = c(0.7, 0.5))
+
+growth <- ggplot() +
+  geom_line(data=hawk.only, aes(x=time, y=VH, color="Hawkfish only")) +
+  geom_line(data=damsel.only, aes(x=time, y=VH, color="Damselfish only")) +
+  labs(x="Time (d)", y="Coral volume (L)", title="Coral growth") +
+  theme_bw() + theme(legend.position = c(0.7, 0.2))
+
+# Plot multipanel figure comparing hawkfish only to damselfish only dynamics
+plot_grid(fish, interN, growth, ncol=3)
+```
+
+> Coral with damselfish supports more total fish biomass, has higher interstitial nitrogen concentrations, and grows faster, than the coral with hawkfish.
