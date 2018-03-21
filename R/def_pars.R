@@ -29,17 +29,19 @@ def_pars <- function(nsym=1) {
     initS=rep(1, nsym),  # Initial symbiont biomass (CmolS)
     b=rep(5, nsym),  # Scaling parameter for bleaching response
     #
-    kv=6.3,  # liters per C-mol H
+    kv=3.15,  # liters per C-mol H
     gamma=1,
     m=0.002, # 1/(d * (cubic meters)^mu)
     mu=1,
     # Damselfish parameters (P)
+    initP=0.001,  # initial biomass
     rp=.05, # intrinsic growth rate
     kp=1,
     Bp=1,
     alpha.wp=1,
     ap=1,  # attack rate on damselfish
     # Hawkfish parameters (W)
+    initW=0.001,  # initial biomass
     rw=.05, # intrinsic growth rate
     kw=1,
     Bw=1,
@@ -48,7 +50,7 @@ def_pars <- function(nsym=1) {
     U=1,  # Uber-predator abundance
     ep=.01,  # damselfish N excretion rate (N per biomass)
     ew=.01,  # hawkfish N excretion rate (N per biomass)
-    D=10,  # flushing rate of N between interstitial volume and ambient environment
+    D=360,  # flushing rate of N between interstitial volume and ambient environment (per day)
     vi=0.5  # fraction of coral volume occupied by water
   ))
 }
