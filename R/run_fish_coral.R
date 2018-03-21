@@ -53,9 +53,9 @@ run_fish_coral <- function(time, env, pars) {
   }
   ## Set initial values of fish and internal nitrogen
   dP.Pdt[1] <- 0 
-  P[1] <- 0.001
+  P[1] <- pars$initP
   dW.Wdt[1] <- 0
-  W[1] <- 0.001
+  W[1] <- pars$initW
   VH[1] <- 1
   VHi[1] <- 0.5
   M[1] <- 0
