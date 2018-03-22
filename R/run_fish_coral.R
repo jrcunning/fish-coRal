@@ -40,7 +40,7 @@ run_fish_coral <- function(time, env, pars) {
   jCO2w[1,] <- jCO2[1]*H[1]/pars$initS - jCP[1,]
   jSG[1,] <- pars$jSGm/10
   rhoC[1,] <- jCP[1,]
-  jNw[1,] <- 0
+  jNw[1,] <- jN[1]
   jST[1,] <- pars$jST0
   rCS[1,] <- pars$jST0 * pars$sigmaCS
   cROS[1,] <- 1
@@ -56,8 +56,8 @@ run_fish_coral <- function(time, env, pars) {
   P[1] <- pars$initP
   dW.Wdt[1] <- 0
   W[1] <- pars$initW
-  VH[1] <- 1
-  VHi[1] <- 0.5
+  VH[1] <- pars$initH * pars$kv
+  VHi[1] <- pars$vi * pars$initH * pars$kv
   M[1] <- 0
   dNi.dt[1] <- 0
   Ni[1] <- env$N[1]
@@ -95,9 +95,7 @@ run_fish_coral <- function(time, env, pars) {
     # Total amount of carbon shared by all symbionts
     rhoC.t <- sum(rhoC[t,]*S[t-1,])
     # Rejection flux: nitrogen (surplus nitrogen wasted to the environment)
-    jNw[t,] <- max(rhoN[t-1]*H[t-1]/sum(S[t-1,]) + rNS[t,] - pars$nNS * jSG[t,], 0)
-    # Total amount of nitrogen wasted by all symbionts
-    jNw.t <- sum(jNw[t,]*S[t-1,])
+    jNw[t,] <- pmax(rhoN[t-1]*H[t-1]/sum(S[t-1,]) + rNS[t,] - pars$nNS * jSG[t,], 0)
     # Symbiont biomass loss (turnover)
     jST[t,] <- pars$jST0 * (1 + pars$b * (cROS[t,] - 1))
     
@@ -138,7 +136,7 @@ run_fish_coral <- function(time, env, pars) {
     # Hawkfish (W)
     dW.Wdt[t] <- pars$rw * (pars$kw * VH[t]^(2/3) - pars$Bw * W[t-1] - pars$alpha.pw * P[t-1]) / (pars$kw * VH[t]^(2/3)) - pars$aw * env$U[t]
     # Internal DIN concentration (Ni)
-    dNi.dt[t] <- pars$D * (env$N[t] - Ni[t-1]) + (pars$ep*P[t-1] + pars$ew*W[t-1] + jNw.t*sum(S[t-1,]) - jN[t]*H[t-1])/VHi[t]
+    dNi.dt[t] <- pars$D * (env$N[t] - Ni[t-1]) + (pars$ep*P[t-1] + pars$ew*W[t-1] + sum(jNw[t,]*S[t-1,]) - jN[t]*H[t-1])/VHi[t]
 
     # State variables
     # ===============
@@ -146,7 +144,7 @@ run_fish_coral <- function(time, env, pars) {
     S[t,] <- S[t-1,] + dS.Sdt[t,] * S[t-1,] * dt  # Biomass (Cmol)
     P[t] <- P[t-1] + dP.Pdt[t] * P[t-1] * dt  # Biomass
     W[t] <- W[t-1] + dW.Wdt[t] * W[t-1] * dt  # Biomass
-    Ni[t] <- Ni[t-1] + dNi.dt[t] * Ni[t-1] * dt # Ni concentration
+    Ni[t] <- Ni[t-1] + dNi.dt[t] * dt # Ni concentration
   }
 
   # Return results
