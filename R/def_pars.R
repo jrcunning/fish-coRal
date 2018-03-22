@@ -12,7 +12,7 @@ def_pars <- function(nsym=1) {
     kCO2=10,  # Rate of host CCM's (molCO2/molC/d)
     KN=1.5e-6,  # Half-saturation constant for host DIN uptake (molN/L)
     KX=1e-6,  # Half-saturation constant for host feeding (CmolX/L)
-    initH=1,  # Initial host biomass (CmolH)
+    initH=0.1,  # Initial host biomass (CmolH)
     yC=0.8,
     jST0=rep(0.03, nsym),  # Symbiont specific biomass turnover rate (d^-1)
     nNS=rep(0.13, nsym),  # N:C ratio in symbiont biomass (-)
@@ -26,7 +26,7 @@ def_pars <- function(nsym=1) {
     sigmaCS=rep(0.9, nsym),  # Proportion of symbiont carbon turnover recycled (-)
     jCPm=rep(2.8, nsym),  # Maximum specific photosynthate production rate (Cmol/CmolS/d)
     jSGm=rep(0.25, nsym),  # Maximum specific symbiont growth rate (CmolS/CmolS/d)
-    initS=rep(1, nsym),  # Initial symbiont biomass (CmolS)
+    initS=rep(0.01, nsym),  # Initial symbiont biomass (CmolS)
     b=rep(5, nsym),  # Scaling parameter for bleaching response
     #
     kv=3.15,  # liters per C-mol H
