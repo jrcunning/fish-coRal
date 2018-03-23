@@ -29,8 +29,8 @@ def_pars <- function(nsym=1) {
     initS=rep(0.01, nsym),  # Initial symbiont biomass (CmolS)
     b=rep(5, nsym),  # Scaling parameter for bleaching response
     #
-    kv=3.15,  # liters per C-mol H
-    gamma=1,
+    kv=3.068,  # liters per C-mol H
+    gamma=1.603,
     m=0.002, # 1/(d * (cubic meters)^mu)
     mu=1,
     # Damselfish parameters (P)

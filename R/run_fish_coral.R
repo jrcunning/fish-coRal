@@ -56,8 +56,8 @@ run_fish_coral <- function(time, env, pars) {
   P[1] <- pars$initP
   dW.Wdt[1] <- 0
   W[1] <- pars$initW
-  VH[1] <- pars$initH * pars$kv
-  VHi[1] <- pars$vi * pars$initH * pars$kv
+  VH[1] <- pars$kv * pars$initH ^ pars$gamma 
+  VHi[1] <- pars$vi * pars$kv * pars$initH ^ pars$gamma 
   M[1] <- 0
   dNi.dt[1] <- 0
   Ni[1] <- env$N[1]
