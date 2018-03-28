@@ -99,15 +99,15 @@ growth <- ggplot(run1, aes(x=time, y=VH)) + geom_line() +
 
 # Plot internal nitrogen concentration
 interN <- ggplot(run1, aes(x=time, y=log10(Ni))) + geom_line() +
-  labs(x="Time (d)", y="Interstitial N (mol/L)",
-       title="log10 Nitrogen within coral head") +
+  labs(x="Time (d)", y="log10 Interstitial N (mol/L)",
+       title="Nitrogen within coral head") +
   theme_bw()
 
 # Plot fish abundance
 fish <- ggplot(run1, aes(x=time)) + 
   geom_line(aes(y=W/VH, col="Hawkfish")) +
   geom_line(aes(y=P/VH, col="Damselfish")) +
-  labs(x="Time (d)", y="Fish biomass",
+  labs(x="Time (d)", y="Fish biomass (per coral-Liter)",
        title="Coral-associated fish") +
   theme_bw() + theme(legend.position = c(0.7, 0.5))
 
@@ -132,7 +132,7 @@ damsel.only <- run_fish_coral(time=time, env=env, pars=def_pars(initW=0, initP=1
 fish <- ggplot() +
   geom_line(data=hawk.only, aes(x=time, y=W, color="Hawkfish only")) +
   geom_line(data=damsel.only, aes(x=time, y=P, color="Damselfish only")) +
-  labs(x="Time (d)", y="Fish biomass", title="Coral-associated fish") +
+  labs(x="Time (d)", y="Fish biomass (per coral-Liter)", title="Coral-associated fish") +
   theme_bw() + theme(legend.position = c(0.7, 0.5))
 
 interN <- ggplot() +
