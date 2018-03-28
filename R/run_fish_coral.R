@@ -68,7 +68,7 @@ run_fish_coral <- function(time, env, pars) {
   # Run simulation by updating
   # ==========================
   for (t in 2:length(time)) {
-    
+
     # Photosynthesis fluxes
     # =====================
     # Light input flux
@@ -101,12 +101,60 @@ run_fish_coral <- function(time, env, pars) {
     # Symbiont biomass loss (turnover)
     jST[t,] <- pars$jST0 * (1 + pars$b * (cROS[t,] - 1))
     
+    NiMeanVect<-vector(length=20)
+    for(i in 1:length(NiMeanVect)){
+    if(i==1){NiMean<-Ni[t-1]}else{
+      if(Nit1>Ni[t-1])
+      {
+        if(i==2)
+        {
+          maxNi<-mean(c(Ni[t],Ni[t-1]))
+          minNi<-Ni[t-1]
+          
+        }else{
+          if(Ni[t]>Ni[t-1])
+          {
+            if(NiMean>(0.01*Ni[t-1]+0.99*Ni[t]))
+            {
+              maxNi<-NiMean
+            }else{
+              minNi<-NiMean
+            }
+          }else{
+            maxNi<-NiMean
+          }
+        }
+        
+      }else{
+        if(i==2)
+        {
+          maxNi<-Ni[t-1]
+          minNi<-max(0,mean(Ni[t],Ni[t-1]))
+        }else{
+          if(Ni[t]<Ni[t-1])
+          {
+            if(NiMean>(0.01*Ni[t-1]+0.99*Ni[t]))
+            {
+              maxNi<-NiMean
+            }else{
+              minNi<-NiMean
+            }
+          }else{
+            minNi<-NiMean
+          }
+        }
+      }
+      NiMean<-mean(c(maxNi,minNi))
+    }
+    NiMeanVect[i]<-NiMean
+    #NiMeanVect[i]<-NiMean
     # Host biomass fluxes
     # ===================
     # Food input flux (prey=both carbon and nitrogen)
     jX[t] <- (pars$jXm * env$X[t] / (env$X[t] + pars$KX))  # Prey uptake from the environment
     # Nitrogen input flux
-    jN[t] <- (pars$jNm * Ni[t-1] / (Ni[t-1] + pars$KN))  # N uptake as a function of nitrogen concentration in coral head (Ni) 
+    #jN[t] <- (pars$jNm * Ni[t-1] / (Ni[t-1] + pars$KN))  # N uptake as a function of nitrogen concentration in coral head (Ni) 
+    jN[t] <- (pars$jNm * NiMean / (NiMean + pars$KN))  # N uptake as a function of nitrogen concentration in coral head (Ni) 
     #rNH[t] <- pars$jHT0 * pars$nNH * pars$sigmaNH  # Recycled N from host biomass turnover
     # Production flux (host biomass formation)
     jHG[t] <- synth(pars$yC*(rhoC.t/H[t-1] + jX[t]), (jN[t] + pars$nNX*jX[t] + rNH) / pars$nNH, pars$jHGm)
@@ -138,7 +186,7 @@ run_fish_coral <- function(time, env, pars) {
     # Hawkfish (W)
     dW.Wdt[t] <- pars$rw * (pars$kw * VH[t]^(2/3) - pars$Bw * W[t-1] - pars$alpha.pw * P[t-1]) / (pars$kw * VH[t]^(2/3)) - pars$aw * env$U[t]
     # Internal DIN concentration (Ni)
-    dNi.dt[t] <- pars$D * (env$N[t] - Ni[t-1]) + (pars$ep*P[t-1] + pars$ew*W[t-1] + sum(jNw[t,]*S[t-1,]) - jN[t]*H[t-1])/VHi[t]
+    dNi.dt[t] <- pars$D * (env$N[t] - NiMean) + (pars$ep*P[t-1] + pars$ew*W[t-1] + sum(jNw[t,]*S[t-1,]) - jN[t]*H[t-1])/VHi[t]
 
     # State variables
     # ===============
@@ -148,6 +196,8 @@ run_fish_coral <- function(time, env, pars) {
     P[t] <- P[t-1] + dP.Pdt[t] * P[t-1] * dt  # Biomass
     W[t] <- W[t-1] + dW.Wdt[t] * W[t-1] * dt  # Biomass
     Ni[t] <- Ni[t-1] + dNi.dt[t] * dt  # Ni concentration
+    if(i==1){Nit1<-Ni[t]}
+  }
   }
 
   # Return results
