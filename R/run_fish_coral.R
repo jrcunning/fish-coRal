@@ -9,6 +9,28 @@ run_fish_coral <- function(time, env, pars) {
 
   # Set initial values
   # ==================
+  # Symbiont fluxes
+  ## Create empty vectors for each flux with length equal to time vector
+  for (x in c("rNS", "jL", "jCP", "jeL", "jNPQ", "jCO2w", "jSG", "rhoC", "jNw", "jST", "rCS", "cROS", "dS.Sdt", "S")) {
+    assign(x, matrix(NA, ncol=nsym, nrow=length(time)))
+  }
+  ## Set initial values for symbiont fluxes
+  jL[1,] <- (1.256307 + 1.385969 * exp(-6.479055 * (sum(pars$initS)/pars$initH))) * env$L[1] * pars$astar
+  jCP[1,] <- pmax(0, vsynth(jL[1,] * pars$yCL, pars$kCO2*10*pars$initH/pars$initS, pars$jCPm), na.rm=T)
+  jCO2w[1,] <- pars$kCO2*10*pars$initH/pars$initS - jCP[1,]
+  jeL[1,] <- pmax(jL[1,] - jCP[1,]/pars$yCL, 0)
+  jNPQ[1,] <- (pars$kNPQ^(-1)+jeL[1,]^(-1))^(-1/1)
+  cROS[1,] <- 1
+  #rNS[1,] <- pars$jST0 * pars$nNS * pars$sigmaNS
+  rNS <- pars$jST0 * pars$nNS * pars$sigmaNS
+  rCS[1,] <- pars$sigmaCS * (pars$jST0 + (1-pars$yC)*pars$jSGm/10/pars$yC)
+  jSG[1,] <- pars$jSGm/10
+  rhoC[1,] <- pmax(jCP[1,] - jSG[1,]/pars$yC, 0)
+  rhoC.t <- sum(rhoC[1,]*pars$initS)
+  jNw[1,] <- (pars$jNm * env$N[1] / (env$N[1] + pars$KN))*pars$initH/pars$initS
+  jST[1,] <- pars$jST0
+  dS.Sdt[1,] <- jSG[1] - jST[1]
+  S[1,] <- pars$initS
   # Coral (host) fluxes
   ## Create empty vectors for each flux with length equal to time vector
   for(x in c("jX", "jN", "rNH", "rhoN", "jeC", "jCO2", "jHG", "jHT", "rCH", "dH.Hdt", "H")) {
@@ -17,35 +39,16 @@ run_fish_coral <- function(time, env, pars) {
   ## Set initial values for host fluxes
   jX[1] <- (pars$jXm * env$X[1] / (env$X[1] + pars$KX))
   jN[1] <- (pars$jNm * env$N[1] / (env$N[1] + pars$KN))
-  rNH[1] <- pars$jHT0 * pars$nNH * pars$sigmaNH
-  rhoN[1] <- jN[1]
+  #rNH[1] <- pars$jHT0 * pars$nNH * pars$sigmaNH
+  rNH <- pars$jHT0 * pars$nNH * pars$sigmaNH
+  jHG[1] <- synth(pars$yC*(rhoC.t/pars$initH + jX[1]), (jN[1] + pars$nNX*jX[1] + rNH) / pars$nNH, pars$jHGm)
+  rhoN[1] <- max(jN[1] + pars$nNX * jX[1] + rNH - pars$nNH * jHG[1], 0)
   jeC[1] <- 10
   jCO2[1] <- pars$kCO2 * jeC[1]
-  jHG[1] <- 0.25
-  jHT[1] <- pars$jHT0
+  #jHT[1] <- pars$jHT0
   rCH[1] <- pars$jHT0 * pars$sigmaCH
-  dH.Hdt[1] <- pars$jHGm
+  dH.Hdt[1] <- jHG[1] - pars$jHT0
   H[1] <- pars$initH
-  # Symbiont fluxes
-  ## Create empty vectors for each flux with length equal to time vector
-  for (x in c("rNS", "jL", "jCP", "jeL", "jNPQ", "jCO2w", "jSG", "rhoC", "jNw", "jST", "rCS", "cROS", "dS.Sdt", "S")) {
-    assign(x, matrix(NA, ncol=nsym, nrow=length(time)))
-  }
-  ## Set initial values for symbiont fluxes
-  rNS[1,] <- pars$jST0 * pars$nNS * pars$sigmaNS
-  jL[1,] <- env$L[1] * pars$astar
-  jCP[1,] <- pmax(0, vsynth(jL[1,] * pars$yCL, jCO2[1]*H[1]/pars$initS, pars$jCPm), na.rm=T)
-  jeL[1,] <- pmax(jL[1,] - jCP[1,]/pars$yCL, 0)
-  jNPQ[1,] <- pars$kNPQ
-  jCO2w[1,] <- jCO2[1]*H[1]/pars$initS - jCP[1,]
-  jSG[1,] <- pars$jSGm/10
-  rhoC[1,] <- jCP[1,]
-  jNw[1,] <- jN[1]
-  jST[1,] <- pars$jST0
-  rCS[1,] <- pars$jST0 * pars$sigmaCS
-  cROS[1,] <- 1
-  dS.Sdt[1,] <- pars$jSGm
-  S[1,] <- pars$initS
   # Initial fish and internal nitrogen conditions
   ## Create empty vectors for each flux with length equal to time vector
   for(x in c("dP.Pdt", "P", "dW.Wdt", "W", "dNi.dt", "Ni", "VH", "VHi", "M")) {
@@ -64,9 +67,8 @@ run_fish_coral <- function(time, env, pars) {
 
   # Run simulation by updating
   # ==========================
-  dt <- time[2] - time[1]
   for (t in 2:length(time)) {
-
+    
     # Photosynthesis fluxes
     # =====================
     # Light input flux
@@ -87,15 +89,15 @@ run_fish_coral <- function(time, env, pars) {
     # Symbiont biomass fluxes
     # =======================
     # Nitrogen input flux
-    rNS[t,] <- pars$jST0 * pars$nNS * pars$sigmaNS  # Recylced N from symbiont biomass turnover.
+    #rNS[t,] <- pars$jST0 * pars$nNS * pars$sigmaNS  # Recylced N from symbiont biomass turnover.
     # Production flux (symbiont biomass formation)
-    jSG[t,] <- vsynth(pars$yC*jCP[t,], (rhoN[t-1]*H[t-1]/sum(S[t-1,]) + rNS[t,])/pars$nNS, pars$jSGm)
+    jSG[t,] <- vsynth(pars$yC*jCP[t,], (rhoN[t-1]*H[t-1]/sum(S[t-1,]) + rNS)/pars$nNS, pars$jSGm)
     # Rejection flux: carbon (surplus carbon shared with the host)
     rhoC[t,] <- pmax(jCP[t,] - jSG[t,]/pars$yC, 0)
     # Total amount of carbon shared by all symbionts
     rhoC.t <- sum(rhoC[t,]*S[t-1,])
     # Rejection flux: nitrogen (surplus nitrogen wasted to the environment)
-    jNw[t,] <- pmax(rhoN[t-1]*H[t-1]/sum(S[t-1,]) + rNS[t,] - pars$nNS * jSG[t,], 0)
+    jNw[t,] <- pmax(rhoN[t-1]*H[t-1]/sum(S[t-1,]) + rNS - pars$nNS * jSG[t,], 0)
     # Symbiont biomass loss (turnover)
     jST[t,] <- pars$jST0 * (1 + pars$b * (cROS[t,] - 1))
     
@@ -105,19 +107,19 @@ run_fish_coral <- function(time, env, pars) {
     jX[t] <- (pars$jXm * env$X[t] / (env$X[t] + pars$KX))  # Prey uptake from the environment
     # Nitrogen input flux
     jN[t] <- (pars$jNm * Ni[t-1] / (Ni[t-1] + pars$KN))  # N uptake as a function of nitrogen concentration in coral head (Ni) 
-    rNH[t] <- jHT[t-1] * pars$nNH * pars$sigmaNH  # Recycled N from host biomass turnover
+    #rNH[t] <- pars$jHT0 * pars$nNH * pars$sigmaNH  # Recycled N from host biomass turnover
     # Production flux (host biomass formation)
-    jHG[t] <- synth(pars$yC*(rhoC.t/H[t-1] + jX[t]), (jN[t] + pars$nNX*jX[t] + rNH[t]) / pars$nNH, pars$jHGm)
+    jHG[t] <- synth(pars$yC*(rhoC.t/H[t-1] + jX[t]), (jN[t] + pars$nNX*jX[t] + rNH) / pars$nNH, pars$jHGm)
     # Rejection flux: nitrogen (surplus nitrogen shared with the symbiont)
-    rhoN[t] <- max(jN[t] + pars$nNX * jX[t] + rNH[t] - pars$nNH * jHG[t], 0)
+    rhoN[t] <- max(jN[t] + pars$nNX * jX[t] + rNH - pars$nNH * jHG[t], 0)
     # Rejection flux: carbon -- given back to symbiont as CO2 input to photosynthesis
     jeC[t] <- max(jX[t] + rhoC.t/H[t-1] - jHG[t]/pars$yC, 0)
     # carbon not used in host biomass is used to activate CCM's that deliver CO2 to photosynthesis
     jCO2[t] <- pars$kCO2 * jeC[t] 
     # Host biomass loss
-    jHT[t] <- pars$jHT0
+    #jHT[t] <- pars$jHT0
     # metabolic CO2 recycled from host biomass turnover
-    rCH[t] <- pars$sigmaCH * (jHT[t] + (1-pars$yC)*jHG[t]/pars$yC)
+    rCH[t] <- pars$sigmaCH * (pars$jHT0 + (1-pars$yC)*jHG[t]/pars$yC)
 
     # Convert coral (H) biomass to biovolume for interactions with fish / nitrogen
     VH[t] <- pars$kv * H[t-1]^pars$gamma
@@ -140,20 +142,20 @@ run_fish_coral <- function(time, env, pars) {
 
     # State variables
     # ===============
+    dt <- time[t] - time[t-1]
     H[t] <- H[t-1] + dH.Hdt[t] * H[t-1] * dt  # Biomass (Cmol)
     S[t,] <- S[t-1,] + dS.Sdt[t,] * S[t-1,] * dt  # Biomass (Cmol)
     P[t] <- P[t-1] + dP.Pdt[t] * P[t-1] * dt  # Biomass
     W[t] <- W[t-1] + dW.Wdt[t] * W[t-1] * dt  # Biomass
-    Ni[t] <- Ni[t-1] + dNi.dt[t] * dt # Ni concentration
+    Ni[t] <- Ni[t-1] + dNi.dt[t] * dt  # Ni concentration
   }
 
   # Return results
   # ==============
   out <- data.frame(
-    time, env$L, env$N, env$X, env$U, jX=jX, jN=jN, rNH=rNH, rhoN=rhoN, jeC=jeC, 
-    jCO2=jCO2, jHG=jHG, jHT=jHT, rCH=rCH, rNS=rNS, jL=jL, jCP=jCP, jeL=jeL, 
-    jNPQ=jNPQ, jCO2w=jCO2w, jSG=jSG, rhoC=rhoC, jNw=jNw, jST=jST, rCS=rCS, 
-    cROS=cROS, VH=VH, VHi=VHi, M=M, dH.Hdt=dH.Hdt, H=H, dS.Sdt=dS.Sdt, S=S, 
-    dP.Pdt=dP.Pdt, P=P, dW.Wdt=dW.Wdt, W=W, dNi.dt=dNi.dt, Ni=Ni)
+    time, env$L, env$N, env$X, env$U, jX=jX, jN=jN, rhoN=rhoN, 
+    jCO2=jCO2, jHG=jHG, jL=jL, jCP=jCP, jSG=jSG, rhoC=rhoC, jNw=jNw,
+    cROS=cROS, VH=VH, dH.Hdt=dH.Hdt, H=H, dS.Sdt=dS.Sdt, S=S, 
+    P=P, W=W, dNi.dt=dNi.dt, Ni=Ni, M=M)
   return(out)
 }
