@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 # Set kintr options
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, cache = TRUE)
 
 # Load libraries
 library(tidyverse)  # install.packages("tidyverse")
@@ -74,26 +74,27 @@ From these data, we estimate the value for the parameter defining coral colony v
 ```{r}
 # Load all default parameter values for model with one Symbiodinium type
 # Default parameters start with 0.001 of both hawkfish and damselfish
-pars <- def_pars(nsym = 1)
+pars <- def_pars(initW=1, initP=1)
 
 # Set time vector to three years
-time <- seq(0, 1825, 0.1)
+time <- c(seq(0.00000, 1095, 0.1))
 
 # Initialize constant environment with intermediate light (15 mol/m2/d) and DIN (1e-6 M), no feeding, and no uber-predators.
-env <- init_env(time=time, L=c(15,15,0), N=c(1e-6,1e-6,0), X=c(0,0,0), U=c(0,0,0))
+env <- init_env(time=time, L=c(15,15,0), N=c(1e-7,1e-7,0), X=c(0,0,0), U=c(0,0,0))
 ```
 
 ### Run simulation with both fish
 ```{r run_model}
-run1 <- run_fish_coral(time=time, env=env, par=pars)
+system.time(
+  run1 <- run_fish_coral(time=time, env=env, par=pars)
+)
 ```
 
 ### Plot coral size, interstitial [N], and associated fish biomass
 ```{r plot_output, fig.height=3, fig.width=10}
 # Plot coral colony volume and internal nitrogen concentration
 growth <- ggplot(run1, aes(x=time, y=VH)) + geom_line() +
-  labs(x="Time (d)", y="Coral volume (L)",
-       title="Coral growth") +
+  labs(x="Time (d)", y="Coral volume (L)", title="Coral growth") +
   theme_bw()
 
 # Plot internal nitrogen concentration
@@ -104,8 +105,8 @@ interN <- ggplot(run1, aes(x=time, y=log10(Ni))) + geom_line() +
 
 # Plot fish abundance
 fish <- ggplot(run1, aes(x=time)) + 
-  geom_line(aes(y=W, col="Hawkfish")) +
-  geom_line(aes(y=P, col="Damselfish")) +
+  geom_line(aes(y=W/VH, col="Hawkfish")) +
+  geom_line(aes(y=P/VH, col="Damselfish")) +
   labs(x="Time (d)", y="Fish biomass",
        title="Coral-associated fish") +
   theme_bw() + theme(legend.position = c(0.7, 0.5))
@@ -120,10 +121,8 @@ plot_grid(growth, interN, fish, ncol = 3)
 ### Run simulations with hawkfish only and damselfish only
 
 ```{r}
-hawk.only <- run_fish_coral(time=time, env=env, 
-                            pars=replace(def_pars(), "initP", 0))
-damsel.only <- run_fish_coral(time=time, env=env, 
-                              pars=replace(def_pars(), "initW", 0))
+  hawk.only <- run_fish_coral(time=time, env=env, pars=def_pars(initW=1, initP=0))
+damsel.only <- run_fish_coral(time=time, env=env, pars=def_pars(initW=0, initP=1))
 ```
 
 ### Plot output with hawkfish only and damselfish only
@@ -140,16 +139,16 @@ interN <- ggplot() +
   geom_line(data=hawk.only, aes(x=time, y=log10(Ni), color="Hawkfish only")) +
   geom_line(data=damsel.only, aes(x=time, y=log10(Ni), color="Damselfish only")) +
   labs(x="Time (d)", y="log10 Interstitial N (mol/L)", title="Nitrogen within coral head") +
-  theme_bw() + theme(legend.position = c(0.7, 0.5))
+  theme_bw() + theme(legend.position = c(0.7, 0.2))
 
 growth <- ggplot() +
   geom_line(data=hawk.only, aes(x=time, y=VH, color="Hawkfish only")) +
   geom_line(data=damsel.only, aes(x=time, y=VH, color="Damselfish only")) +
   labs(x="Time (d)", y="Coral volume (L)", title="Coral growth") +
-  theme_bw() + theme(legend.position = c(0.7, 0.2))
+  theme_bw() + theme(legend.position = c(0.7, 0.5))
 
 # Plot multipanel figure comparing hawkfish only to damselfish only dynamics
-plot_grid(fish, interN, growth, ncol=3)
+plot_grid(growth, interN, fish, ncol=3)
 ```
 
 > Coral with damselfish supports more total fish biomass, has higher interstitial nitrogen concentrations, and grows faster, than the coral with hawkfish.
