@@ -108,7 +108,7 @@ run_fish_coral <- function(time, env, pars) {
       } else {
         if (Nit1 > Ni[t-1]) {
           if (i == 2) {
-            maxNi <- mean(c(Ni[t], Ni[t-1]))
+            maxNi <- (Ni[t] + Ni[t-1]) / 2
             minNi <- Ni[t-1]
           } else {
             if (Ni[t] > Ni[t-1]) {
@@ -124,7 +124,7 @@ run_fish_coral <- function(time, env, pars) {
         } else {
           if (i == 2) {
             maxNi <- Ni[t-1]
-            minNi <- max(0, mean(Ni[t], Ni[t-1]))
+            minNi <- max(0, (Ni[t] + Ni[t-1]) / 2)
           } else {
             if (Ni[t] < Ni[t-1]) {
               if (NiMean > (0.01 * Ni[t-1] + 0.99 * Ni[t])) {
@@ -137,7 +137,7 @@ run_fish_coral <- function(time, env, pars) {
             }
           }
         }
-        NiMean <- mean(c(maxNi, minNi))
+        NiMean <- (maxNi + minNi) / 2
       }
       NiMeanVect[i] <- NiMean
 
