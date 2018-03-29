@@ -65,7 +65,6 @@ run_fish_coral <- function(time, env, pars) {
   dNi.dt[1] <- 0
   Ni[1] <- env$N[1]
   
-  Ni_est_conv <- vector(length=1)
   # Run simulation by updating
   # ==========================
   for (t in 2:length(time)) {
@@ -143,10 +142,12 @@ run_fish_coral <- function(time, env, pars) {
     dW.Wdt[t] <- pars$rw * (pars$kw * VH[t]^(2/3) - pars$Bw * W[t-1] - pars$alpha.pw * P[t-1]) / (pars$kw * VH[t]^(2/3)) - pars$aw * env$U[t]
     
     
-    #Mean vector of Ni is just for house keeping you could delete and manually set length
-    #Length of 20 was shortest that worked well for me
-    Ni_est_vect <- vector(length = 30)
-    for (i in 1:length(Ni_est_vect)) {
+    # Optimization loop to determine Ni and jN within each dt interval
+    fracT <- 0
+    convergeValue <- 0.0001
+    i <- 1
+    keepFitting <- TRUE
+    while (keepFitting) {
       if (i == 1) {  # On first loop set Ni_est guess to known value at start of period
         Ni_est <- Ni[t-1]
       } else if (i == 2) {  # After first trial set an upper and lower maximum value of Ni_est to between Ni[t-1] and first update Ni[t]
@@ -154,24 +155,23 @@ run_fish_coral <- function(time, env, pars) {
         min_Ni_est <- max(c(0, min(c(Ni_est, (Ni[t] + Ni[t-1]) / 2))))  # Whichever is lower: previous estimate or mean of new and previous estimates
         Ni_est <- (max_Ni_est + min_Ni_est) / 2  # New estimate is halfway between max and min guesses
       } else {  # Finally continually update range bounds to reduce maximum if guess is too high or increase minumum if guess was too low
-        if (Ni_est > (0.1 * Ni[t-1] + 0.9 * Ni[t])) {  # Here you determine what the best guess should converge to. 99% of the final value worked.
-          max_Ni_est <- Ni_est #New bound becomes the previous best guess
+        if (Ni_est > (fracT * Ni[t-1] + (1 - fracT) * Ni[t])) {  # Here you determine what the best guess should converge to. 99% of the final value worked.
+          max_Ni_est <- Ni_est  # New bound becomes the previous best guess
         } else {
-          min_Ni_est <- Ni_est #New bound becomes the previous best guess
+          min_Ni_est <- Ni_est  # New bound becomes the previous best guess
         }
-        Ni_est <- (max_Ni_est + min_Ni_est) / 2 #New best guess is middle of the bounds
+        Ni_est <- (max_Ni_est + min_Ni_est) / 2  # New best guess is middle of the bounds
+        keepFitting <- (max_Ni_est - min_Ni_est) > convergeValue * (abs(Ni[t] - Ni[t-1]))
       }
-      Ni_est_vect[i] <- Ni_est #track the history of guesses to confirm they converge
-      
       
       # Nitrogen uptake rate
       jN[t] <- (pars$jNm * Ni_est / (Ni_est + pars$KN))
       # Internal DIN concentration (Ni)
       dNi.dt[t] <- pars$D * (env$N[t] - Ni_est) + (pars$ep*P[t-1] + pars$ew*W[t-1] + sum(jNw[t,]*S[t-1,]) - jN[t]*H[t-1])/VHi[t]
       Ni[t] <- Ni[t-1] + dNi.dt[t] * dt  # Ni concentration
-      
+      i <- i + 1
     }
-    Ni_est_conv[t] <- abs(Ni_est_vect[i] / Ni_est_vect[1] - 1)
+    
     # State variables
     # ===============
     H[t] <- H[t-1] + dH.Hdt[t] * H[t-1] * dt  # Biomass (Cmol)
@@ -188,6 +188,6 @@ run_fish_coral <- function(time, env, pars) {
     time, env$L, env$N, env$X, env$U, jX=jX, jN=jN, rhoN=rhoN, 
     jCO2=jCO2, jHG=jHG, jL=jL, jCP=jCP, jSG=jSG, rhoC=rhoC, jNw=jNw,
     cROS=cROS, VH=VH, dH.Hdt=dH.Hdt, H=H, dS.Sdt=dS.Sdt, S=S, 
-    P=P, W=W, dNi.dt=dNi.dt, Ni=Ni, M=M, Ni_est_conv=Ni_est_conv)
+    P=P, W=W, dNi.dt=dNi.dt, Ni=Ni, M=M)
   return(out)
 }
