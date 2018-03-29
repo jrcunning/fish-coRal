@@ -101,45 +101,26 @@ run_fish_coral <- function(time, env, pars) {
     # Symbiont biomass loss (turnover)
     jST[t,] <- pars$jST0 * (1 + pars$b * (cROS[t,] - 1))
     
+    #Mean vector of Ni is just for house keeping you could delete and manually set length
+    #Length of 20 was shortest that worked well for me
     NiMeanVect <- vector(length = 20)
     for (i in 1:length(NiMeanVect)) {
-      if (i == 1) {
+      
+      if (i == 1) { #On first loop set Ni_est guess to known value at start of period
         NiMean <- Ni[t-1]
-      } else {
-        if (Nit1 > Ni[t-1]) {
-          if (i == 2) {
-            maxNi <- (Ni[t] + Ni[t-1]) / 2
-            minNi <- Ni[t-1]
-          } else {
-            if (Ni[t] > Ni[t-1]) {
-              if (NiMean > (0.01 * Ni[t-1] + 0.99 * Ni[t])) {
-                maxNi <- NiMean
-              } else {
-                minNi <- NiMean
-              }
-            } else {
-              maxNi <- NiMean
-            }
-          }
-        } else {
-          if (i == 2) {
-            maxNi <- Ni[t-1]
-            minNi <- max(0, (Ni[t] + Ni[t-1]) / 2)
-          } else {
-            if (Ni[t] < Ni[t-1]) {
-              if (NiMean > (0.01 * Ni[t-1] + 0.99 * Ni[t])) {
-                maxNi <- NiMean
-              } else {
-                minNi <- NiMean
-              }
-            } else {
-              minNi <- NiMean
-            }
-          }
-        }
+      } else if (i == 2) { #After first trial set an upper and lower maximum value of Ni_est to between Ni[t-1] and first update Ni[t]
+        maxNi <-max(c(NiMean, (Ni[t] + Ni[t-1]) / 2))
+        minNi<-max(c(0, min(c(NiMean, (Ni[t] + Ni[t-1]) / 2))))
         NiMean <- (maxNi + minNi) / 2
+      } else { #Finally continually update range bounds to reduce maximum if guess is too high or increase minumum if guess was too low
+        if (NiMean > (0.01 * Ni[t-1] + 0.99 * Ni[t])) { #Here you determin what the best guess should converge to. 99% of the final value worked.
+          maxNi <- NiMean #New bound becomes the previous best guess
+        } else {
+          minNi <- NiMean #New bound becomes the previous best guess
+        }
+        NiMean <- (maxNi + minNi) / 2 #New best guess is middle of the bounds
       }
-      NiMeanVect[i] <- NiMean
+      NiMeanVect[i] <- NiMean #track the history of guesses to confirm they converge
 
       # Host biomass fluxes
       # ===================
