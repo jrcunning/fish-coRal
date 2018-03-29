@@ -144,9 +144,10 @@ run_fish_coral <- function(time, env, pars) {
     
     # Optimization loop to determine Ni and jN within each dt interval
     fracT <- 0
-    convergeValue <- 0.0001
+    convergeValue <- 0.000001
     i <- 1
     keepFitting <- TRUE
+    #Ni_est_vect<-vector()
     while (keepFitting) {
       if (i == 1) {  # On first loop set Ni_est guess to known value at start of period
         Ni_est <- Ni[t-1]
@@ -165,8 +166,8 @@ run_fish_coral <- function(time, env, pars) {
         }
         #Ni_est <- (max_Ni_est + min_Ni_est) / 2  # New best guess is middle of the bounds
         #keepFitting <- (max_Ni_est - min_Ni_est) > convergeValue * (abs(Ni[t] - Ni[t-1]))
-        Ni_est <- (max_Ni_err * min_Ni_est + min_Ni_err * max_Ni_est) / (min_Ni_err + max_Ni_err)  # New best guess is middle of the bounds
-        keepFitting <- (max_Ni_est - min_Ni_est) > convergeValue*(abs(Ni[t-1] - max(0, Ni[t])))
+        Ni_est <- ((0.95*max_Ni_err+0.05*min_Ni_err) * min_Ni_est + (0.05*max_Ni_err+0.95*min_Ni_err) * max_Ni_est) / (min_Ni_err + max_Ni_err)  # New best guess is middle of the bounds
+        keepFitting <- (max_Ni_est - min_Ni_est) > convergeValue*min(c(abs(Ni[t-1] - max(0, Ni[t])),Ni_est))
       }
       # Nitrogen uptake rate
       jN[t] <- (pars$jNm * Ni_est / (Ni_est + pars$KN))
