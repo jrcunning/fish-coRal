@@ -153,17 +153,21 @@ run_fish_coral <- function(time, env, pars) {
       } else if (i == 2) {  # After first trial set an upper and lower maximum value of Ni_est to between Ni[t-1] and first update Ni[t]
         max_Ni_est <- max(c(Ni_est, (Ni[t] + Ni[t-1]) / 2))  # Whichever is higher: previous estimate, or mean of new and previous estimates
         min_Ni_est <- max(c(0, min(c(Ni_est, (Ni[t] + Ni[t-1]) / 2))))  # Whichever is lower: previous estimate or mean of new and previous estimates
-        Ni_est <- (max_Ni_est + min_Ni_est) / 2  # New estimate is halfway between max and min guesses
+        max_Ni_err <- min_Ni_err <- abs(Ni_est - (fracT * Ni[t-1] + (1 - fracT) * Ni[t]))
+        Ni_est <- (min_Ni_est + max_Ni_est) / 2  # New estimate is halfway between max and min guesses
       } else {  # Finally continually update range bounds to reduce maximum if guess is too high or increase minumum if guess was too low
         if (Ni_est > (fracT * Ni[t-1] + (1 - fracT) * Ni[t])) {  # Here you determine what the best guess should converge to. 99% of the final value worked.
           max_Ni_est <- Ni_est  # New bound becomes the previous best guess
+          max_Ni_err <- abs(Ni_est - (fracT * Ni[t-1] + (1 - fracT) * Ni[t]))
         } else {
           min_Ni_est <- Ni_est  # New bound becomes the previous best guess
+          min_Ni_err <- abs(Ni_est - (fracT * Ni[t-1] + (1 - fracT) * Ni[t]))
         }
-        Ni_est <- (max_Ni_est + min_Ni_est) / 2  # New best guess is middle of the bounds
-        keepFitting <- (max_Ni_est - min_Ni_est) > convergeValue * (abs(Ni[t] - Ni[t-1]))
+        #Ni_est <- (max_Ni_est + min_Ni_est) / 2  # New best guess is middle of the bounds
+        #keepFitting <- (max_Ni_est - min_Ni_est) > convergeValue * (abs(Ni[t] - Ni[t-1]))
+        Ni_est <- (max_Ni_err * min_Ni_est + min_Ni_err * max_Ni_est) / (min_Ni_err + max_Ni_err)  # New best guess is middle of the bounds
+        keepFitting <- (max_Ni_est - min_Ni_est) > convergeValue*(abs(Ni[t-1] - max(0, Ni[t])))
       }
-      
       # Nitrogen uptake rate
       jN[t] <- (pars$jNm * Ni_est / (Ni_est + pars$KN))
       # Internal DIN concentration (Ni)
