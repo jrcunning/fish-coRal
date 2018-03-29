@@ -6,7 +6,7 @@ run_fish_coral <- function(time, env, pars) {
   # Define synthesizing unit formula
   synth <- function(x, y, m) 1 / ((1 / m) + (1 / x) + (1 / y) - (1 / (x + y)))
   vsynth <- Vectorize(synth)  # Vectorize synthesizing unit for nsym > 1
-
+  
   # Set initial values
   # ==================
   # Symbiont fluxes
@@ -64,11 +64,12 @@ run_fish_coral <- function(time, env, pars) {
   M[1] <- 0
   dNi.dt[1] <- 0
   Ni[1] <- env$N[1]
-
+  
+  Ni_est_conv <- vector(length=1)
   # Run simulation by updating
   # ==========================
   for (t in 2:length(time)) {
-
+    dt <- time[t] - time[t-1]
     # Photosynthesis fluxes
     # =====================
     # Light input flux
@@ -101,85 +102,92 @@ run_fish_coral <- function(time, env, pars) {
     # Symbiont biomass loss (turnover)
     jST[t,] <- pars$jST0 * (1 + pars$b * (cROS[t,] - 1))
     
+    
+    
+    # Host biomass fluxes
+    # ===================
+    # Food input flux (prey=both carbon and nitrogen)
+    jX[t] <- (pars$jXm * env$X[t] / (env$X[t] + pars$KX))  # Prey uptake from the environment
+    # Nitrogen input flux
+    #jN[t] <- (pars$jNm * Ni[t-1] / (Ni[t-1] + pars$KN))  # N uptake as a function of nitrogen concentration in coral head (Ni)
+    #jN[t] <- (pars$jNm * Ni_est / (Ni_est + pars$KN))  # N uptake as a function of nitrogen concentration in coral head (Ni)
+    #rNH[t] <- pars$jHT0 * pars$nNH * pars$sigmaNH  # Recycled N from host biomass turnover
+    # Production flux (host biomass formation)
+    jHG[t] <- synth(pars$yC*(rhoC.t/H[t-1] + jX[t]), (jN[t-1] + pars$nNX*jX[t] + rNH) / pars$nNH, pars$jHGm)
+    # Rejection flux: nitrogen (surplus nitrogen shared with the symbiont)
+    rhoN[t] <- max(jN[t-1] + pars$nNX * jX[t] + rNH - pars$nNH * jHG[t], 0)
+    # Rejection flux: carbon -- given back to symbiont as CO2 input to photosynthesis
+    jeC[t] <- max(jX[t] + rhoC.t/H[t-1] - jHG[t]/pars$yC, 0)
+    # carbon not used in host biomass is used to activate CCM's that deliver CO2 to photosynthesis
+    jCO2[t] <- pars$kCO2 * jeC[t]
+    # Host biomass loss
+    #jHT[t] <- pars$jHT0
+    # metabolic CO2 recycled from host biomass turnover
+    rCH[t] <- pars$sigmaCH * (pars$jHT0 + (1-pars$yC)*jHG[t]/pars$yC)
+    
+    # Convert coral (H) biomass to biovolume for interactions with fish / nitrogen
+    VH[t] <- pars$kv * H[t-1]^pars$gamma
+    VHi[t] <- VH[t] * pars$vi  # Internal volume of water
+    # Coral mortality rate (breakage as a function of colony volume VH)
+    M[t] <- pars$m * VH[t]^pars$mu
+    
+    # Balance equations
+    # =================
+    # Host (H)
+    dH.Hdt[t] <- jHG[t] - pars$jHT0 - M[t] # Specific growth rates (Cmol/Cmol/d)
+    # Symbiont (S)
+    dS.Sdt[t,] <- jSG[t,] - jST[t,] - M[t] # Specific growth rates (Cmol/Cmol/d)
+    # Damselfish (P)
+    dP.Pdt[t] <- pars$rp * (pars$kp * VH[t] - pars$Bp * P[t-1] - pars$alpha.wp * W[t-1]) / (pars$kp * VH[t]) - pars$ap * env$U[t]
+    # Hawkfish (W)
+    dW.Wdt[t] <- pars$rw * (pars$kw * VH[t]^(2/3) - pars$Bw * W[t-1] - pars$alpha.pw * P[t-1]) / (pars$kw * VH[t]^(2/3)) - pars$aw * env$U[t]
+    
+    
     #Mean vector of Ni is just for house keeping you could delete and manually set length
     #Length of 20 was shortest that worked well for me
-    NiMeanVect <- vector(length = 20)
-    for (i in 1:length(NiMeanVect)) {
-      
-      if (i == 1) { #On first loop set Ni_est guess to known value at start of period
-        NiMean <- Ni[t-1]
-      } else if (i == 2) { #After first trial set an upper and lower maximum value of Ni_est to between Ni[t-1] and first update Ni[t]
-        maxNi <-max(c(NiMean, (Ni[t] + Ni[t-1]) / 2))
-        minNi<-max(c(0, min(c(NiMean, (Ni[t] + Ni[t-1]) / 2))))
-        NiMean <- (maxNi + minNi) / 2
-      } else { #Finally continually update range bounds to reduce maximum if guess is too high or increase minumum if guess was too low
-        if (NiMean > (0.01 * Ni[t-1] + 0.99 * Ni[t])) { #Here you determin what the best guess should converge to. 99% of the final value worked.
-          maxNi <- NiMean #New bound becomes the previous best guess
+    Ni_est_vect <- vector(length = 30)
+    for (i in 1:length(Ni_est_vect)) {
+      if (i == 1) {  # On first loop set Ni_est guess to known value at start of period
+        Ni_est <- Ni[t-1]
+      } else if (i == 2) {  # After first trial set an upper and lower maximum value of Ni_est to between Ni[t-1] and first update Ni[t]
+        max_Ni_est <- max(c(Ni_est, (Ni[t] + Ni[t-1]) / 2))  # Whichever is higher: previous estimate, or mean of new and previous estimates
+        min_Ni_est <- max(c(0, min(c(Ni_est, (Ni[t] + Ni[t-1]) / 2))))  # Whichever is lower: previous estimate or mean of new and previous estimates
+        Ni_est <- (max_Ni_est + min_Ni_est) / 2  # New estimate is halfway between max and min guesses
+      } else {  # Finally continually update range bounds to reduce maximum if guess is too high or increase minumum if guess was too low
+        if (Ni_est > (0.1 * Ni[t-1] + 0.9 * Ni[t])) {  # Here you determine what the best guess should converge to. 99% of the final value worked.
+          max_Ni_est <- Ni_est #New bound becomes the previous best guess
         } else {
-          minNi <- NiMean #New bound becomes the previous best guess
+          min_Ni_est <- Ni_est #New bound becomes the previous best guess
         }
-        NiMean <- (maxNi + minNi) / 2 #New best guess is middle of the bounds
+        Ni_est <- (max_Ni_est + min_Ni_est) / 2 #New best guess is middle of the bounds
       }
-      NiMeanVect[i] <- NiMean #track the history of guesses to confirm they converge
-
-      # Host biomass fluxes
-      # ===================
-      # Food input flux (prey=both carbon and nitrogen)
-      jX[t] <- (pars$jXm * env$X[t] / (env$X[t] + pars$KX))  # Prey uptake from the environment
-      # Nitrogen input flux
-      #jN[t] <- (pars$jNm * Ni[t-1] / (Ni[t-1] + pars$KN))  # N uptake as a function of nitrogen concentration in coral head (Ni) 
-      jN[t] <- (pars$jNm * NiMean / (NiMean + pars$KN))  # N uptake as a function of nitrogen concentration in coral head (Ni) 
-      #rNH[t] <- pars$jHT0 * pars$nNH * pars$sigmaNH  # Recycled N from host biomass turnover
-      # Production flux (host biomass formation)
-      jHG[t] <- synth(pars$yC*(rhoC.t/H[t-1] + jX[t]), (jN[t] + pars$nNX*jX[t] + rNH) / pars$nNH, pars$jHGm)
-      # Rejection flux: nitrogen (surplus nitrogen shared with the symbiont)
-      rhoN[t] <- max(jN[t] + pars$nNX * jX[t] + rNH - pars$nNH * jHG[t], 0)
-      # Rejection flux: carbon -- given back to symbiont as CO2 input to photosynthesis
-      jeC[t] <- max(jX[t] + rhoC.t/H[t-1] - jHG[t]/pars$yC, 0)
-      # carbon not used in host biomass is used to activate CCM's that deliver CO2 to photosynthesis
-      jCO2[t] <- pars$kCO2 * jeC[t] 
-      # Host biomass loss
-      #jHT[t] <- pars$jHT0
-      # metabolic CO2 recycled from host biomass turnover
-      rCH[t] <- pars$sigmaCH * (pars$jHT0 + (1-pars$yC)*jHG[t]/pars$yC)
+      Ni_est_vect[i] <- Ni_est #track the history of guesses to confirm they converge
       
-      # Convert coral (H) biomass to biovolume for interactions with fish / nitrogen
-      VH[t] <- pars$kv * H[t-1]^pars$gamma
-      VHi[t] <- VH[t] * pars$vi  # Internal volume of water
-      # Coral mortality rate (breakage as a function of colony volume VH)
-      M[t] <- pars$m * VH[t]^pars$mu
       
-      # Balance equations
-      # =================
-      # Host (H)
-      dH.Hdt[t] <- jHG[t] - pars$jHT0 - M[t] # Specific growth rates (Cmol/Cmol/d)
-      # Symbiont (S)
-      dS.Sdt[t,] <- jSG[t,] - jST[t,] - M[t] # Specific growth rates (Cmol/Cmol/d)
-      # Damselfish (P)
-      dP.Pdt[t] <- pars$rp * (pars$kp * VH[t] - pars$Bp * P[t-1] - pars$alpha.wp * W[t-1]) / (pars$kp * VH[t]) - pars$ap * env$U[t]
-      # Hawkfish (W)
-      dW.Wdt[t] <- pars$rw * (pars$kw * VH[t]^(2/3) - pars$Bw * W[t-1] - pars$alpha.pw * P[t-1]) / (pars$kw * VH[t]^(2/3)) - pars$aw * env$U[t]
+      # Nitrogen uptake rate
+      jN[t] <- (pars$jNm * Ni_est / (Ni_est + pars$KN))
       # Internal DIN concentration (Ni)
-      dNi.dt[t] <- pars$D * (env$N[t] - NiMean) + (pars$ep*P[t-1] + pars$ew*W[t-1] + sum(jNw[t,]*S[t-1,]) - jN[t]*H[t-1])/VHi[t]
-      
-      # State variables
-      # ===============
-      dt <- time[t] - time[t-1]
-      H[t] <- H[t-1] + dH.Hdt[t] * H[t-1] * dt  # Biomass (Cmol)
-      S[t,] <- S[t-1,] + dS.Sdt[t,] * S[t-1,] * dt  # Biomass (Cmol)
-      P[t] <- P[t-1] + dP.Pdt[t] * P[t-1] * dt  # Biomass
-      W[t] <- W[t-1] + dW.Wdt[t] * W[t-1] * dt  # Biomass
+      dNi.dt[t] <- pars$D * (env$N[t] - Ni_est) + (pars$ep*P[t-1] + pars$ew*W[t-1] + sum(jNw[t,]*S[t-1,]) - jN[t]*H[t-1])/VHi[t]
       Ni[t] <- Ni[t-1] + dNi.dt[t] * dt  # Ni concentration
-      if (i == 1) Nit1 <- Ni[t]
+      
     }
+    Ni_est_conv[t] <- abs(Ni_est_vect[i] / Ni_est_vect[1] - 1)
+    # State variables
+    # ===============
+    H[t] <- H[t-1] + dH.Hdt[t] * H[t-1] * dt  # Biomass (Cmol)
+    S[t,] <- S[t-1,] + dS.Sdt[t,] * S[t-1,] * dt  # Biomass (Cmol)
+    P[t] <- P[t-1] + dP.Pdt[t] * P[t-1] * dt  # Biomass
+    W[t] <- W[t-1] + dW.Wdt[t] * W[t-1] * dt  # Biomass
+    
+    
   }
-
+  
   # Return results
   # ==============
   out <- data.frame(
     time, env$L, env$N, env$X, env$U, jX=jX, jN=jN, rhoN=rhoN, 
     jCO2=jCO2, jHG=jHG, jL=jL, jCP=jCP, jSG=jSG, rhoC=rhoC, jNw=jNw,
     cROS=cROS, VH=VH, dH.Hdt=dH.Hdt, H=H, dS.Sdt=dS.Sdt, S=S, 
-    P=P, W=W, dNi.dt=dNi.dt, Ni=Ni, M=M)
+    P=P, W=W, dNi.dt=dNi.dt, Ni=Ni, M=M, Ni_est_conv=Ni_est_conv)
   return(out)
 }
