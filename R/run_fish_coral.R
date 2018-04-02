@@ -127,7 +127,7 @@ run_fish_coral <- function(time, env, pars) {
           min_Ni_est <- Ni_est  # New bound becomes the previous best guess
           min_Ni_err <- abs(Ni_est - (fracT * Ni[t-1] + (1 - fracT) * Ni[t]))
         }
-        Ni_est <- ((0.95*max_Ni_err+0.05*min_Ni_err) * min_Ni_est + (0.05*max_Ni_err+0.95*min_Ni_err) * max_Ni_est) / (min_Ni_err + max_Ni_err)  # New best guess is middle of the bounds
+        Ni_est <- ((0.995*max_Ni_err+0.005*min_Ni_err) * min_Ni_est + (0.005*max_Ni_err+0.995*min_Ni_err) * max_Ni_est) / (min_Ni_err + max_Ni_err)  # New best guess is middle of the bounds
         keepFitting <- (max_Ni_est - min_Ni_est) > convergeValue*min(c(abs(Ni[t-1] - max(0, Ni[t])),Ni_est))
       }
       # Nitrogen uptake rate
