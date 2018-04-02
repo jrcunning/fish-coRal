@@ -1,0 +1,122 @@
+---
+title: "Compare Ni estimation routine to full numerical integration"
+author: "Ross Cunning"
+date: "4/02/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Set kintr options
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, cache = TRUE)
+
+# Load libraries
+library(tidyverse)  # install.packages("tidyverse")
+library(cowplot)  # install.packages("cowplot")
+
+# Load R functions
+sapply(list.files(path="R/", pattern="*", full.names = TRUE), FUN=source)
+```
+
+
+### Set parameters and environment
+```{r set_pars_env}
+# Load all default parameter values for model with one Symbiodinium type
+pars <- def_pars(initW=1, initP=1)
+
+# Initialize constant environment with intermediate light (15 mol/m2/d) and low DIN (1e-7 M), no feeding, and no uber-predators.
+
+env0 <- init_env(time=seq(0, 100, 0.0001), 
+                L=c(15,15,0), N=c(1e-7,1e-7,0), X=c(0,0,0), U=c(0,0,0))
+
+env <- init_env(time=seq(0, 100, 0.1), 
+                L=c(15,15,0), N=c(1e-7,1e-7,0), X=c(0,0,0), U=c(0,0,0))
+```
+
+### Run simulations with both models
+```{r run_original}
+# Model with full integration at dt=0.00001
+system.time(
+  run0 <- run_fish_coral0(time=seq(0, 100, 0.0001), env=env0, par=pars)
+)
+```
+
+```{r run_estimation}
+# Model with Ni estimation routine, dt=0.1
+system.time(
+  run1 <- run_fish_coral(time=seq(0, 100, 0.1), env=env, par=pars)
+)
+```
+
+### Compare dynamics during first 3 days
+
+```{r plot_3days, fig.height=3, fig.width=10, echo=FALSE}
+# Sample 1 out of every 1000 rows for plotting
+run0.red <- run0[seq(1, nrow(run0), 1000), ]
+# Subset first day
+run0.day1 <- run0.red %>% filter(time <= 3)
+run1.day1 <- run1 %>% filter(time <= 3)
+
+plot_grid(ncol=2,
+          
+  # Plot coral colony volume and internal nitrogen concentration
+  ggplot() + 
+    geom_line(data = run0.day1, aes(x = time, y = VH), linetype = 1, size = 0.5) + 
+    geom_line(data = run1.day1, aes(x = time, y = VH), linetype = 2, size = 0.5) +
+    labs(x = "Time (d)", y = "Coral volume (L)", title = "Coral growth") +
+    theme_bw(),
+  
+  # Plot internal nitrogen concentration
+  ggplot() +
+    geom_line(data = run0.day1, aes(x = time, y = log10(Ni)), linetype = 1, size = 0.5) + 
+    geom_line(data = run1.day1, aes(x = time, y = log10(Ni)), linetype = 2, size = 0.5) +
+    labs(x = "Time (d)", y = "log10 Interstitial N (mol/L)",
+         title = "Nitrogen within coral head") +
+    theme_bw()
+  
+)
+```
+
+### Compare dynamics over 100 days
+
+```{r plot_100days, fig.height=3, fig.width=10, echo=FALSE}
+# Sample 1 out of every 1000 rows for plotting
+run0.red <- run0[seq(1, nrow(run0), 1000), ]
+# Subset first day
+run0.day1 <- run0.red %>% filter(time <= 100)
+run1.day1 <- run1 %>% filter(time <= 100)
+
+plot_grid(ncol=2,
+          
+  # Plot coral colony volume and internal nitrogen concentration
+  ggplot() + 
+    geom_line(data = run0.day1, aes(x = time, y = VH), linetype = 1, size = 0.5) + 
+    geom_line(data = run1.day1, aes(x = time, y = VH), linetype = 2, size = 0.5) +
+    labs(x = "Time (d)", y = "Coral volume (L)", title = "Coral growth") +
+    theme_bw(),
+  
+  # Plot internal nitrogen concentration
+  ggplot() +
+    geom_line(data = run0.day1, aes(x = time, y = log10(Ni)), linetype = 1, size = 0.5) + 
+    geom_line(data = run1.day1, aes(x = time, y = log10(Ni)), linetype = 2, size = 0.5) +
+    labs(x = "Time (d)", y = "log10 Interstitial N (mol/L)",
+         title = "Nitrogen within coral head") +
+    theme_bw()
+  
+)
+```
+
+#### Compare final values (after 100 days) of each quantity
+
+```{r final_day1, fig.width=5, fig.height=4}
+run1.f <- run1.day1[nrow(run1.day1), 6:ncol(run1.day1)]
+run0.f <- run0.day1[nrow(run0.day1), 6:ncol(run0.day1)]
+
+diffs <- abs(run1.f / run0.f - 1) %>% gather()
+
+ggplot(diffs, aes(x=value)) + geom_dotplot(binwidth=0.00005) +
+  labs(x="Relative difference from full integration") +
+  scale_y_continuous(NULL, breaks = NULL) + 
+  scale_x_continuous(breaks=seq(0, 0.0015, 0.00025)) +
+  geom_text(aes(label=key, y=0.1, angle=45), data=diffs %>% filter(value > 0.0005),
+            nudge_y = c(0.075, 0.15))
+```
